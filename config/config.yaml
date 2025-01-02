@@ -1,0 +1,8 @@
+server:
+  url: http://127.0.0.1:9000
+  id: minioadmin
+  key: minioadmin
+client:
+  upload-db-path: database/upload.db
+  download-db-path: database/download.db
+  save-size: 52428800 # 50M自动保存
