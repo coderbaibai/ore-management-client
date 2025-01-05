@@ -48,11 +48,15 @@ class S3Uploader:
         self.__file_size = 0
 
         # 传输控制
-        self.__mutex = threading.Lock()
+        self.__mutex_pause = threading.Lock()
+        self.__mutex_process = threading.Lock()
         self.__isPaused = False
 
     def get_process(self):
-        return self.__process
+        self.__mutex_process.acquire_lock()
+        ret = self.__process
+        self.__mutex_process.release_lock()
+        return ret
 
     def get_file_size(self):
         return self.__file_size
@@ -88,9 +92,9 @@ class S3Uploader:
             items.sort(key=lambda key_item: key_item['count'])
             last = items[-1].copy()
 
-        self.__mutex.acquire_lock()
+        self.__mutex_pause.acquire_lock()
         self.__isPaused = False
-        self.__mutex.release_lock()
+        self.__mutex_pause.release_lock()
         # 开始上传
         with open(last['local'], 'rb') as f:
             this_time_size = 0
@@ -102,15 +106,15 @@ class S3Uploader:
             cur_size += part_size * done
             while True:
                 # 获取锁
-                self.__mutex.acquire_lock()
+                self.__mutex_pause.acquire_lock()
                 # 如果暂停
                 if self.__isPaused:
                     # 写回数据
                     for item in items:
                         UploaderItem.insert_many(item).on_conflict_ignore().execute()
-                    self.__mutex.release_lock()
+                    self.__mutex_pause.release_lock()
                     break
-                self.__mutex.release_lock()
+                self.__mutex_pause.release_lock()
                 # 读出数据
                 data = f.read(part_size)
                 # 如果已经读完
@@ -140,8 +144,10 @@ class S3Uploader:
                 cur_size += len(data)
                 this_time_size += len(data)
                 # 超过1%时更新process
+                self.__mutex_process.acquire_lock()
                 if self.__process != int(100 * cur_size / file_size):
                     self.__process = int(100 * cur_size / file_size)
+                self.__mutex_process.release_lock()
                 # 每50M数据自动保存一次
                 if this_time_size > gConfig['client']['save-size']:
                     UploaderItem.insert_many(items).on_conflict_ignore().execute()
@@ -166,9 +172,9 @@ class S3Uploader:
                 UploadId=items[0]['sign']
             )
     def stop(self):
-        self.__mutex.acquire_lock()
+        self.__mutex_pause.acquire_lock()
         self.__isPaused = True
-        self.__mutex.release_lock()
+        self.__mutex_pause.release_lock()
 
 
 

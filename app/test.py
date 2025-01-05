@@ -16,6 +16,7 @@ from utils.S3Uploader import S3Uploader
 from utils.S3Downloader import S3Downloader
 
 from utils.S3Utils import s3_client
+from config.GConfig import gConfig
 
 app = QApplication(sys.argv)
 window = QWidget()
@@ -189,6 +190,10 @@ def cancel_up_clicked():
 def cancel_down_clicked():
     downloader.cancel()
 
+def updateBar():
+    pb_up.setValue(uploader.get_process())
+    pb_down.setValue(downloader.get_process())
+
 
 def showWindow():
     window.setGeometry(100, 100, 800, 800)
@@ -236,6 +241,11 @@ def showWindow():
     btn_show.setText("展示")
     btn_show.clicked.connect(show_buckets)
 
+    # 设置定时器
+    timer = QTimer(window)
+    timer.timeout.connect(updateBar)
+    timer.start(gConfig['client']['update-time'])
+    
     window.setWindowTitle("PyQt5")
     window.show()
 

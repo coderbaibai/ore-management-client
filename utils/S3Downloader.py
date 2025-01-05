@@ -30,11 +30,15 @@ class S3Downloader:
         self.__file_size = 0
 
         # 传输控制
-        self.__mutex = threading.Lock()
+        self.__mutex_pause = threading.Lock()
+        self.__mutex_process = threading.Lock()
         self.__isPaused = False
 
     def get_process(self):
-        return self.__process
+        self.__mutex_process.acquire_lock()
+        ret = self.__process
+        self.__mutex_process.release_lock()
+        return ret
 
     def get_file_size(self):
         return self.__file_size
@@ -46,19 +50,19 @@ class S3Downloader:
         file_size = self.__client.head_object(Bucket=self.__bucket_name, Key=self.__cloud_path)['ContentLength']
         part_size = int(file_size / 100 + 1024)
         cur_size = os.path.getsize(self.__local_path)
-        self.__mutex.acquire_lock()
+        self.__mutex_pause.acquire_lock()
         self.__isPaused = False
-        self.__mutex.release()
+        self.__mutex_pause.release()
         with open(self.__local_path, 'ab') as f:
             while True:
                 # 获取锁
-                self.__mutex.acquire_lock()
+                self.__mutex_pause.acquire_lock()
                 # 如果暂停
                 if self.__isPaused:
-                    self.__mutex.release()
+                    self.__mutex_pause.release()
                     break
                 else:
-                    self.__mutex.release()
+                    self.__mutex_pause.release()
                 # 如果完成
                 if cur_size >= file_size:
                     break
@@ -73,14 +77,16 @@ class S3Downloader:
 
                 cur_size = os.path.getsize(self.__local_path)
 
+                self.__mutex_process.acquire_lock()
                 if self.__process != int(100 * cur_size / file_size):
                     self.__process = int(100 * cur_size / file_size)
+                self.__mutex_process.release_lock()
 
     def cancel(self):
         if os.path.exists(self.__local_path):
             os.remove(self.__local_path)
 
     def stop(self):
-        self.__mutex.acquire_lock()
+        self.__mutex_pause.acquire_lock()
         self.__isPaused = True
-        self.__mutex.release_lock()
+        self.__mutex_pause.release_lock()
