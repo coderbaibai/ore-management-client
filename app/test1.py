@@ -15,8 +15,8 @@ from qfluentwidgets import *
 from utils.S3Uploader import S3Uploader
 from utils.S3Downloader import S3Downloader
 
-from utils.S3Utils import s3_client
 from config.GConfig import gConfig
+import boto3
 
 app = QApplication(sys.argv)
 window = QWidget()
@@ -46,6 +46,20 @@ cur_page = 1
 
 uploader = S3Uploader("python-test-bucket","cloud_temp_1GB.txt","/home/bhx/tmp/temp_1GB.txt")
 downloader = S3Downloader("python-test-bucket","cloud_temp_1GB.txt","/home/bhx/tmp/download_temp_1GB.txt")
+
+s3_client  = boto3.client(
+            's3',
+            aws_access_key_id=gConfig['server']['id'],
+            aws_secret_access_key=gConfig['server']['key'],
+            endpoint_url=gConfig['server']['url']  # 配置区域
+        )
+
+s3_resource  = boto3.resource(
+            's3',
+            aws_access_key_id=gConfig['server']['id'],
+            aws_secret_access_key=gConfig['server']['key'],
+            endpoint_url=gConfig['server']['url']  # 配置区域
+        )
 
 
 def clear_layout(target):

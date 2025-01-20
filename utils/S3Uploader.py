@@ -1,28 +1,16 @@
 import csv
+from datetime import datetime
 import os
 import threading
 from pathlib import Path
 import boto3
 from config.GConfig import gConfig
+from qfluentwidgets import InfoBarPosition,InfoBar
+from PyQt5.QtCore import *
 from peewee import SqliteDatabase, Model, IntegerField, TextField, AutoField
-
-db = SqliteDatabase(Path.cwd()/gConfig['client']['upload-db-path'])
-
-class UploaderItem(Model):
-    id = TextField(primary_key=True)
-    sign = TextField(null=True)
-    count = IntegerField(null=True)
-    local = TextField(null=True)
-    bucket = TextField(null=True)
-    cloud = TextField(null=True)
-    eTag = TextField(null=True)
-
-    class Meta:
-        database = db
-        table_name = 'tb_uploader'
-
-db.connect()
-db.create_tables([UploaderItem])
+from utils.SqliteUtils import UploaderItem,TransportRecord
+from utils.TypeUtils import FileType,StateType
+from pathlib import Path
 
 
 class S3Uploader:
@@ -52,6 +40,7 @@ class S3Uploader:
         self.__mutex_process = threading.Lock()
         self.__isPaused = False
 
+
     def get_process(self):
         self.__mutex_process.acquire_lock()
         ret = self.__process
@@ -61,6 +50,38 @@ class S3Uploader:
     def get_file_size(self):
         return self.__file_size
 
+    def start(self):
+        # 检查重复上传
+        res = list(TransportRecord.select().where(
+            (TransportRecord.local == self.__local_path) &
+            (TransportRecord.bucket == self.__bucket_name) &
+            (TransportRecord.cloud == self.__cloud_path) &
+            (TransportRecord.finish == 0)
+        ))
+        if len(res) != 0:
+            InfoBar.error(
+                title='上传出错',
+                content="存在相同的上传，请勿重复上传",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=1000,
+                parent=self
+            ).show()
+        else:
+            path = Path(self.__local_path)
+            TransportRecord.insert({
+                'name' :path.name,
+                'type' : FileType.file,
+                'size' : os.stat(self.__local_path).st_size,
+                'state' : StateType.upload,
+                'time' : datetime.now().strftime('%Y.%m.%d'),
+                'local' : self.__local_path,
+                'bucket' : self.__bucket_name,
+                'cloud' : self.__cloud_path,
+                'finish' : 0
+            }).execute()
+        
     def execute(self):
         last = {}
         # 如果找到之前的记录
@@ -171,6 +192,7 @@ class S3Uploader:
                 Key=items[0]['local'],
                 UploadId=items[0]['sign']
             )
+
     def stop(self):
         self.__mutex_pause.acquire_lock()
         self.__isPaused = True

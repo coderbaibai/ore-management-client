@@ -1,0 +1,19 @@
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # 添加模块所在目录到 sys.path
+from utils.SqliteUtils import TransportRecord
+from utils.TypeUtils import *
+
+data = {
+    'name' :'测试文件',
+    'type' : FileType.file,
+    'size' : 1024,
+    'state' : StateType.download,
+    'time' : '2025.1.19',
+    'local' : '/home/bhx/tmp',
+    'bucket' : 'python-test-bucket',
+    'cloud' : 'xwechat_files/cloud_temp_1GB.txt',
+    'finish' : 1
+}
+
+TransportRecord.insert(data).execute()

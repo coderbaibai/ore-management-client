@@ -2,36 +2,65 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QColor
-import sys
-from qfluentwidgets import (NavigationItemPosition, MessageBox, setTheme, Theme, MSFluentWindow,
-                            NavigationAvatarWidget, qrouter, SubtitleLabel, setFont,FluentWindow)
+from qfluentwidgets import (InfoBar, InfoBarPosition, setTheme, Theme, FluentWindow,
+                            NavigationAvatarWidget, qrouter, SubtitleLabel, setFont,FluentLabelBase)
 from qfluentwidgets import FluentIcon as FIF
 
-class Widget(QFrame):
+from models.TransportHeader import TransportHeader
+from models.TransportTable import TransportTable
 
-    def __init__(self, text: str, parent=None):
-        super().__init__(parent=parent)
-        self.label = SubtitleLabel(text, self)
-        self.hBoxLayout = QHBoxLayout(self)
+from utils.S3Utils import s3Utils
+from utils.SqliteUtils import *
 
-        setFont(self.label, 24)
-        self.label.setAlignment(Qt.AlignCenter)
-        self.hBoxLayout.addWidget(self.label, 1, Qt.AlignCenter)
-
-        # 必须给子界面设置全局唯一的对象名
-        self.setObjectName(text.replace(' ', '-'))
-
-class TransportWidget(FluentWindow):
-
+class TransportWidget(SubtitleLabel):
     def __init__(self,text:str,parent=None):
         super().__init__(parent=parent)
-
-        self.uploadingInterface = Widget('Uploading Interface', self)
-        self.downloadingInterface = Widget('Downloading Interface', self)
-        self.finishInterface = Widget('Finish Interface', self)
-
-        self.addSubInterface(self.uploadingInterface, FIF.HOME, '正在上传')
-        self.addSubInterface(self.downloadingInterface, FIF.MUSIC, '正在下载')
-        self.addSubInterface(self.finishInterface, FIF.VIDEO, '传输完成')
-
         self.setObjectName(text.replace(' ', '-'))
+        self.vLayout = QVBoxLayout(self)
+        self.header = TransportHeader(self)
+        self.table = TransportTable(self)
+
+        self.vLayout.setContentsMargins(0,0,0,0)
+        self.vLayout.setSpacing(0)
+        self.vLayout.addWidget(self.header)
+        self.vLayout.addWidget(self.table)
+        self.setLayout(self.vLayout)
+        
+        self.table.show_signal.connect(self.handle_show_signal)
+        self.table.number_signal.connect(self.handle_number_signal)
+        self.header.delete_signal.connect(self.handle_delete_signal)
+        self.header.update_signal.connect(self.handle_update_signal)
+
+        self.table.update()
+
+    def handle_jump_signal(self, data):
+        # 处理子组件传递的列表参数
+        self.header.addItemAndJump(data)
+
+
+    def handle_show_signal(self, data):
+        # 处理子组件传递的列表参数
+        self.header.changeBtnState(data)
+
+    def handle_delete_signal(self):
+        ids = self.table.getTargets()
+        if len(ids) == 0:
+            TransportRecord.delete().execute()
+        for id in ids:
+            TransportRecord.delete_by_id(id)
+        InfoBar.success(
+            title='删除成功',
+            content="",
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=1000,
+            parent=self
+        ).show()
+        self.table.update()
+
+    def handle_update_signal(self):
+        self.table.update()
+
+    def handle_number_signal(self,data):
+        self.header.setNumber(data)
