@@ -1,5 +1,6 @@
 import csv
 from datetime import datetime
+import math
 import os
 import threading
 from pathlib import Path
@@ -14,10 +15,12 @@ from pathlib import Path
 
 
 class S3Uploader:
-    def __init__(self,bucket_name,cloud_path,local_path):
+    def __init__(self,bucket_name,cloud_path,local_path,id=None):
         self.__bucket_name = bucket_name
         self.__cloud_path = cloud_path
         self.__local_path = local_path
+        self.__id = id
+        self.__isFinished = False
         # 初始化客户端
         self.__client  = boto3.client(
             's3',
@@ -35,6 +38,10 @@ class S3Uploader:
         self.__process = 0
         self.__file_size = 0
 
+        self.__can_calculate_rate = False
+        self.__last_size = 0
+        self.__cur_size = 0
+
         # 传输控制
         self.__mutex_pause = threading.Lock()
         self.__mutex_process = threading.Lock()
@@ -49,38 +56,45 @@ class S3Uploader:
 
     def get_file_size(self):
         return self.__file_size
+    
+    def get_id(self):
+        return self.__id
+    
+    def get_delta(self):
+        if self.__can_calculate_rate:
+            res = self.__cur_size-self.__last_size
+            self.__last_size = self.__cur_size
+            return res
+        else:
+            return 0
+    
+    def is_finished(self):
+        return self.__isFinished
 
-    def start(self):
+    def start(bucket,path,local) ->bool:
         # 检查重复上传
         res = list(TransportRecord.select().where(
-            (TransportRecord.local == self.__local_path) &
-            (TransportRecord.bucket == self.__bucket_name) &
-            (TransportRecord.cloud == self.__cloud_path) &
+            (TransportRecord.local == local) &
+            (TransportRecord.bucket == bucket) &
+            (TransportRecord.cloud == path) &
             (TransportRecord.finish == 0)
         ))
         if len(res) != 0:
-            InfoBar.error(
-                title='上传出错',
-                content="存在相同的上传，请勿重复上传",
-                orient=Qt.Horizontal,
-                isClosable=True,
-                position=InfoBarPosition.TOP,
-                duration=1000,
-                parent=self
-            ).show()
+            return False
         else:
-            path = Path(self.__local_path)
+            localPath = Path(local)
             TransportRecord.insert({
-                'name' :path.name,
+                'name' :localPath.name,
                 'type' : FileType.file,
-                'size' : os.stat(self.__local_path).st_size,
+                'size' : os.stat(local).st_size,
                 'state' : StateType.upload,
                 'time' : datetime.now().strftime('%Y.%m.%d'),
-                'local' : self.__local_path,
-                'bucket' : self.__bucket_name,
-                'cloud' : self.__cloud_path,
+                'local' : local,
+                'bucket' : bucket,
+                'cloud' : path,
                 'finish' : 0
             }).execute()
+            return True
         
     def execute(self):
         last = {}
@@ -119,12 +133,12 @@ class S3Uploader:
         # 开始上传
         with open(last['local'], 'rb') as f:
             this_time_size = 0
-            cur_size = 0
-            file_size = os.stat(last['local']).st_size
-            part_size = int(file_size / 100) + 1024
+            self.__cur_size = 0
+            self.__file_size = os.stat(last['local']).st_size
+            part_size =max(math.ceil(self.__file_size / 100),1024)
             done = last['count']
             f.seek(part_size * done)
-            cur_size += part_size * done
+            self.__cur_size += part_size * done
             while True:
                 # 获取锁
                 self.__mutex_pause.acquire_lock()
@@ -150,6 +164,7 @@ class S3Uploader:
                         MultipartUpload={'Parts': res}
                     )
                     UploaderItem.delete().where(UploaderItem.sign==last['sign']).execute()
+                    self.__isFinished = True
                     break
                 # 上传分段
                 etag = self.__client.upload_part(Bucket=self.__bucket_name,
@@ -162,12 +177,13 @@ class S3Uploader:
                 print("upload"+str(last['count']))
                 items.append(last.copy())
 
-                cur_size += len(data)
+                self.__cur_size += len(data)
+                self.__can_calculate_rate = True
                 this_time_size += len(data)
                 # 超过1%时更新process
                 self.__mutex_process.acquire_lock()
-                if self.__process != int(100 * cur_size / file_size):
-                    self.__process = int(100 * cur_size / file_size)
+                if self.__process != int(100 * self.__cur_size / self.__file_size):
+                    self.__process = int(100 * self.__cur_size / self.__file_size)
                 self.__mutex_process.release_lock()
                 # 每50M数据自动保存一次
                 if this_time_size > gConfig['client']['save-size']:
@@ -197,6 +213,7 @@ class S3Uploader:
         self.__mutex_pause.acquire_lock()
         self.__isPaused = True
         self.__mutex_pause.release_lock()
+
 
 
 

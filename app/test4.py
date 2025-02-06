@@ -4,7 +4,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # 
 from utils.SqliteUtils import TransportRecord
 from utils.TypeUtils import *
 
-data = {
+data_finish = {
     'name' :'测试文件',
     'type' : FileType.file,
     'size' : 1024,
@@ -15,5 +15,18 @@ data = {
     'cloud' : 'xwechat_files/cloud_temp_1GB.txt',
     'finish' : 1
 }
+data_up = {
+    'name' :'测试文件',
+    'type' : FileType.file,
+    'size' : 1024,
+    'state' : StateType.upload,
+    'time' : '2025.1.19',
+    'local' : '/home/bhx/tmp',
+    'bucket' : 'python-test-bucket',
+    'cloud' : 'xwechat_files/cloud_temp_1GB.txt',
+    'finish' : 0
+}
 
-TransportRecord.insert(data).execute()
+# TransportRecord.insert(data_finish).execute()
+# TransportRecord.insert(data_up).execute()
+TransportRecord.delete_by_id(3)

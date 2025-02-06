@@ -45,6 +45,9 @@ class S3Utils:
         self.__client.delete_object(Bucket=sourceBucket,Key=sourceKey)
 
     def deleteFile(self,bucket,key):
-        self.__client.delete_object(Bucket=bucket,Key=key)
+        response = self.__client.list_objects_v2(Bucket=bucket, Prefix=key)
+        for obj in response['Contents']:
+            self.__client.delete_object(Bucket=bucket,Key=obj['Key'])
+
 
 s3Utils = S3Utils()

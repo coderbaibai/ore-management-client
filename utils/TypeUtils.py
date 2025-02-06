@@ -36,3 +36,22 @@ class StateType():
             return '下载完成'
         else:
             return 'unknown'
+        
+class UnitTranslator():
+    def convert_bytes(byte_size):
+        # 定义单位
+        units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
+        
+        # 确保字节数是正数
+        if byte_size < 0:
+            return "字节数不能为负"
+
+        # 获取单位的索引
+        i = 0
+        while byte_size >= 1024 and i < len(units) - 1:
+            byte_size /= 1024.0
+            i += 1
+
+        # 返回转换后的值和单位
+        return f"{byte_size:.2f} {units[i]}"
+ 

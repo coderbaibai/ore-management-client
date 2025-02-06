@@ -12,6 +12,10 @@ from models.FilesTable import FilesTable
 from utils.S3Utils import s3Utils
 
 class FilesWidget(SubtitleLabel):
+
+    upload_signal = pyqtSignal(str,str,str)
+    download_signal = pyqtSignal(str,list)
+
     def __init__(self,text:str,parent=None):
         super().__init__(parent=parent)
         self.setObjectName(text.replace(' ', '-'))
@@ -38,6 +42,10 @@ class FilesWidget(SubtitleLabel):
         self.header.move_signal.connect(self.handle_move_signal)
         self.header.paste_signal.connect(self.handle_paste_signal)
         self.header.delete_signal.connect(self.handle_delete_signal)
+
+        self.header.upload_signal.connect(self.handle_upload_signal)
+        self.header.download_signal.connect(self.handle_download_signal)
+        self.table.number_signal.connect(self.handle_number_signal)
 
         self.table.update(['全部文件'])
 
@@ -171,5 +179,16 @@ class FilesWidget(SubtitleLabel):
             duration=1000,
             parent=self
         ).show()
+    
+    def handle_upload_signal(self,bucket,path,local):
+        self.upload_signal.emit(bucket,path,local)
+    
+    def handle_download_signal(self,bucket,local,path):
+        targets = self.table.getTargets()
+        targets = [{'local':local+s,'cloud':path+s} for s in targets]
+        self.download_signal.emit(bucket,targets)
+        
+    def handle_number_signal(self,data):
+        self.header.setNumber(data)
 
 

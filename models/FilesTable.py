@@ -9,7 +9,7 @@ from qfluentwidgets import FluentIcon as FIF
 
 from models.FilesWidgetHeader import FilesWidgetHeader
 from utils.S3Utils import s3Utils
-from utils.TypeUtils import FileType
+from utils.TypeUtils import FileType, UnitTranslator
 
 
 
@@ -232,6 +232,7 @@ class FilesTable(SubtitleLabel):
 
     jump_signal = pyqtSignal(str)
     show_signal = pyqtSignal(bool)
+    number_signal = pyqtSignal(int)
 
     def __init__(self,parent=None):
         super().__init__(parent=parent)
@@ -280,7 +281,7 @@ class FilesTable(SubtitleLabel):
         if len(currentPath)==1:
             for bucket in response:
                 name = bucket['Name']
-                time = bucket['CreationDate'].strftime('%Y %m %H:%M:%S')
+                time = bucket['CreationDate'].strftime('%Y.%m.%d  %H:%M')
                 type = FileType.directory
                 size = '-'
                 self.items.append(FileItem(type,name,size,time,self))
@@ -288,10 +289,10 @@ class FilesTable(SubtitleLabel):
             if 'Contents' in response:
                 for obj in response['Contents']:
                     name = os.path.basename(os.path.normpath(obj['Key']))
-                    time = obj['LastModified'].strftime('%Y %m %H:%M:%S')
+                    time = obj['LastModified'].strftime('%Y.%m.%d  %H:%M')
                     type = FileType.file
-                    size = str(obj['Size'])
-                    self.items.append(FileItem(type,name,size,time,self))
+                    size = obj['Size']
+                    self.items.append(FileItem(type,name,UnitTranslator.convert_bytes(size),time,self))
 
             if 'CommonPrefixes' in response:
                 for common_prefix in response['CommonPrefixes']:
@@ -313,6 +314,8 @@ class FilesTable(SubtitleLabel):
             i.state_change_signal.connect(self.handle_state_change_signal)
             self.fileLayout.addWidget(i)
             i.show()
+
+        self.number_signal.emit(len(self.items))
 
     def getTargets(self):
         res = []

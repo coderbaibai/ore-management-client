@@ -7,4 +7,6 @@ client:
   download-db-path: database/download.db
   transport-db-path: database/transport.db
   save-size: 52428800 # 50M自动保存
-  update-time: 250 # 50M自动保存
+  update-time: 1000 # 1s自动刷新
+  uploader-length: 5 
+  download-path: 

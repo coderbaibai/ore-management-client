@@ -1,12 +1,12 @@
 import collections
-from tkinter import filedialog
+import subprocess
 from uuid import uuid1
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QColor
 from qfluentwidgets import (BreadcrumbBar, CommandBar, setFont, SearchLineEdit, BodyLabel,
-                            Action, PrimaryPushButton, ToolButton,CommandBarView,PushButton)
+                            Action, PrimaryPushButton, ToolButton,CommandBarView,PushButton,Path)
 from qfluentwidgets import FluentIcon as FIF
 
 from utils.S3Utils import *
@@ -19,6 +19,9 @@ class FilesWidgetHeader(QWidget):
     move_signal = pyqtSignal(str,str)
     paste_signal = pyqtSignal(str,str)
     delete_signal = pyqtSignal(str,str)
+
+    upload_signal = pyqtSignal(str,str,str)
+    download_signal = pyqtSignal(str,str,str)
 
     def __init__(self,parent=None):
         super().__init__(parent=parent)
@@ -47,7 +50,7 @@ class FilesWidgetHeader(QWidget):
         self.pasteBtn.clicked.connect(self.pasteItems)
 
         self.commandBarTrans = CommandBarView(self)
-        self.commandBarTrans.addAction(Action(FIF.DOWNLOAD,text='下载', triggered=lambda: print("下载")))
+        self.commandBarTrans.addAction(Action(FIF.DOWNLOAD,text='下载', triggered=self.downloadItems))
         self.commandBarTrans.addSeparator()
         self.commandBarTrans.addAction(Action(FIF.COPY,text='复制', triggered=self.copyItems))
         self.commandBarTrans.addSeparator()
@@ -68,10 +71,16 @@ class FilesWidgetHeader(QWidget):
         self.topLayout.addWidget(self.search)
         # 设置底部
         self.bottomLayout = QHBoxLayout()
+        self.bottomLayout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.navi = BreadcrumbBar(self)
         self.labelTotal = BodyLabel("已加载x个",self)
-        self.bottomLayout.addWidget(self.navi)
-        self.bottomLayout.addWidget(self.labelTotal,alignment=(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
+        self.updateBtn = ToolButton(FIF.UPDATE)
+        self.updateBtn.clicked.connect(self.handleUpdate)
+
+        self.bottomLayout.addWidget(self.navi,10)
+        self.bottomLayout.addStretch(2)
+        self.bottomLayout.addWidget(self.labelTotal)
+        self.bottomLayout.addWidget(self.updateBtn)
         # 设置整体
         self.vLayout.addLayout(self.topLayout)
         self.vLayout.addLayout(self.bottomLayout)
@@ -214,13 +223,37 @@ class FilesWidgetHeader(QWidget):
         pathStr = '/'.join(self.currentPath[2:])
         if pathStr!='':
             pathStr = pathStr+'/'
-        self.pasteBtn.setVisible(True)
+        self.changeBarState(False)
         self.delete_signal.emit(self.currentPath[1],pathStr)
 
     def uploadItems(self):
         if self.isUpload:
-            localPath = filedialog.askopenfilename(title="选择文件", filetypes=[("All files", "*.*")])
+            localPath, _ = QFileDialog.getOpenFileName(None, "选择文件", "", "所有文件 (*)")
             if localPath=='' or localPath=='()':
                 return
-            
+            pathStr = '/'.join(self.currentPath[2:])
+            if pathStr!='':
+                pathStr = pathStr+'/'
+            pathStr = pathStr+Path(localPath).name
+            self.upload_signal.emit(self.currentPath[1],pathStr,localPath)
+    
+    def downloadItems(self):
+        localPath = QFileDialog.getExistingDirectory(None, "选择文件夹",'/')
+        # 检查用户是否选择了文件夹
+        if localPath=='':
+            return
+        if localPath!= '/':
+            localPath = localPath+'/'
+        pathStr = '/'.join(self.currentPath[2:])
+        if pathStr!='':
+            pathStr = pathStr+'/'
+        self.download_signal.emit(self.currentPath[1],localPath,pathStr)
+
+    def setNumber(self,data):
+        self.labelTotal.setText(f'已加载{data}条记录')
+
+    def handleUpdate(self):
+        self.update_signal.emit(self.currentPath.copy())
+
+
         

@@ -10,9 +10,8 @@ from qfluentwidgets import FluentIcon as FIF
 from models.FilesWidgetHeader import FilesWidgetHeader
 from utils.S3Utils import s3Utils
 from utils.SqliteUtils import TransportRecord
-from utils.TypeUtils import FileType,StateType
+from utils.TypeUtils import FileType,StateType,UnitTranslator
 from peewee import Select
-
 
 class TransportItem(BodyLabel):
 
@@ -243,7 +242,7 @@ class TransportTable(SubtitleLabel):
         self.items.clear()
         temps :list[TransportRecord] = list(TransportRecord.select().where(TransportRecord.finish == 1))
         for tmp in temps:
-            self.items.append(TransportItem(tmp.id,tmp.type,tmp.name,str(tmp.size),tmp.time,tmp.state,self))
+            self.items.append(TransportItem(tmp.id,tmp.type,tmp.name,UnitTranslator.convert_bytes(tmp.size),tmp.time,tmp.state,self))
 
         while self.fileLayout.count() > 1:
             item = self.fileLayout.takeAt(1)  # 取出布局中的第一个子项
