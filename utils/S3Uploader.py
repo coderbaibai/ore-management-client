@@ -24,15 +24,15 @@ class S3Uploader:
         # 初始化客户端
         self.__client  = boto3.client(
             's3',
-            aws_access_key_id=gConfig['server']['id'],
-            aws_secret_access_key=gConfig['server']['key'],
-            endpoint_url=gConfig['server']['url']  # 配置区域
+            aws_access_key_id=gConfig['server']['minio']['id'],
+            aws_secret_access_key=gConfig['server']['minio']['key'],
+            endpoint_url=gConfig['server']['minio']['url']  # 配置区域
         )
         self.__source = boto3.resource(
             's3',
-            aws_access_key_id=gConfig['server']['id'],
-            aws_secret_access_key=gConfig['server']['key'],
-            endpoint_url=gConfig['server']['url']  # 配置区域
+            aws_access_key_id=gConfig['server']['minio']['id'],
+            aws_secret_access_key=gConfig['server']['minio']['key'],
+            endpoint_url=gConfig['server']['minio']['url']  # 配置区域
         )
         # 初始化上传项目文件
         self.__process = 0

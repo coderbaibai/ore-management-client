@@ -1,7 +1,10 @@
+import asyncio
+from threading import Thread
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QColor
+from qasync import asyncSlot
 from qfluentwidgets import (InfoBar, InfoBarPosition, setTheme, Theme, FluentWindow,
                             NavigationAvatarWidget, qrouter, SubtitleLabel, setFont,FluentLabelBase)
 from qfluentwidgets import FluentIcon as FIF
@@ -45,13 +48,43 @@ class FilesWidget(SubtitleLabel):
 
         self.header.upload_signal.connect(self.handle_upload_signal)
         self.header.download_signal.connect(self.handle_download_signal)
+        self.header.search_signal.connect(self.handle_search_signal)
         self.table.number_signal.connect(self.handle_number_signal)
+        self.table.rename_signal.connect(self.handle_rename_signal)
 
         self.table.update(['全部文件'])
 
     def handle_jump_signal(self, data):
         # 处理子组件传递的列表参数
         self.header.addItemAndJump(data)
+
+    async def rename_process(self,old_name,new_name):
+        bucket,path = self.header.getBucketAndCurrentPath()
+        isSuccess,msg = await s3Utils.rename(bucket,path+old_name,path+new_name)
+        self.table.update(self.header.currentPath)
+        if isSuccess:
+            InfoBar.success(
+                title='重命名成功',
+                content=msg,
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self.window()
+            ).show()
+        else:
+            InfoBar.error(
+                title='重命名失败',
+                content=msg,
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self.window()
+            ).show()
+    @asyncSlot(str,str)
+    async def handle_rename_signal(self, old_name,new_name):
+        await self.rename_process(old_name,new_name)
 
     def handle_update_signal(self, data):
         # 处理子组件传递的列表参数
@@ -190,5 +223,8 @@ class FilesWidget(SubtitleLabel):
         
     def handle_number_signal(self,data):
         self.header.setNumber(data)
+
+    def handle_search_signal(self,bucket,key):
+        self.table.search_update(bucket,key)
 
 

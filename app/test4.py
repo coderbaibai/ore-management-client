@@ -27,6 +27,6 @@ data_up = {
     'finish' : 0
 }
 
-# TransportRecord.insert(data_finish).execute()
-# TransportRecord.insert(data_up).execute()
+TransportRecord.insert(data_finish).execute()
+TransportRecord.insert(data_up).execute()
 TransportRecord.delete_by_id(3)

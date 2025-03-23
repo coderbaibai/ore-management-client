@@ -1,8 +1,4 @@
-import csv
-import os
-import threading
 from pathlib import Path
-import boto3
 from config.GConfig import gConfig
 from peewee import SqliteDatabase, Model, IntegerField, TextField, AutoField,PrimaryKeyField
 # 上传记录数据库

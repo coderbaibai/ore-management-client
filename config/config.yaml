@@ -1,7 +1,10 @@
 server:
-  url: http://127.0.0.1:9000
-  id: minioadmin
-  key: minioadmin
+  minio:
+    url: http://127.0.0.1:9000
+    id: minioadmin
+    key: minioadmin
+  spring:
+    url: http://127.0.0.1:8080
 client:
   upload-db-path: database/upload.db
   download-db-path: database/download.db

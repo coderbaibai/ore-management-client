@@ -49,16 +49,16 @@ downloader = S3Downloader("python-test-bucket","cloud_temp_1GB.txt","/home/bhx/t
 
 s3_client  = boto3.client(
             's3',
-            aws_access_key_id=gConfig['server']['id'],
-            aws_secret_access_key=gConfig['server']['key'],
-            endpoint_url=gConfig['server']['url']  # 配置区域
+            aws_access_key_id=gConfig['server']['minio']['id'],
+            aws_secret_access_key=gConfig['server']['minio']['key'],
+            endpoint_url=gConfig['server']['minio']['url']  # 配置区域
         )
 
 s3_resource  = boto3.resource(
             's3',
-            aws_access_key_id=gConfig['server']['id'],
-            aws_secret_access_key=gConfig['server']['key'],
-            endpoint_url=gConfig['server']['url']  # 配置区域
+            aws_access_key_id=gConfig['server']['minio']['id'],
+            aws_secret_access_key=gConfig['server']['minio']['key'],
+            endpoint_url=gConfig['server']['minio']['url']  # 配置区域
         )
 
 

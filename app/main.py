@@ -1,3 +1,4 @@
+import asyncio
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
@@ -15,11 +16,13 @@ from models.TransportWidget import TransportWidget
 from models.UploadWidget import UploadWidget
 from models.DownloadWidget import DownloadWidget
 from models.SettingWidget import SettingWidget
+from models.UsersWidget import UsersWidget
 
 import tkinter as tk
 from tkinter import filedialog
 from utils.S3Uploader import *
 from utils.S3Downloader import *
+from qasync import QEventLoop, asyncSlot
 
 # 创建一个 Tkinter 根窗口（不显示窗口）
 
@@ -49,7 +52,7 @@ class Window(FluentWindow):
         self.downloadInterface = DownloadWidget('Download Interface',self)
         self.uploadInterface = UploadWidget('Upload Interface',self)
         self.videoInterface = Widget('Video Interface', self)
-        self.libraryInterface = Widget('library Interface', self)
+        self.libraryInterface = UsersWidget('Management Interface', self)
         self.settingInterface = SettingWidget('settings Interface', self)
         self.navigationInterface.setExpandWidth(170)
         self.navigationInterface.setCollapsible(False)
@@ -108,10 +111,18 @@ class Window(FluentWindow):
             else:
                 self.downloadInterface.start_download(bucket,tmp['cloud'],tmp['local'])
 
-if __name__ == '__main__':
+async def main():
     root = tk.Tk()
     root.withdraw()  # 隐藏主窗口
     app = QApplication(sys.argv)
+    loop = QEventLoop(app)
+    asyncio.set_event_loop(loop)
     w = Window()
     w.show()
-    app.exec()
+
+    with loop:
+        sys.exit(loop.run_forever())
+
+if __name__ == '__main__':
+    asyncio.run(main())
+

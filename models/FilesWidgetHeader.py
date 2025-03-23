@@ -23,6 +23,8 @@ class FilesWidgetHeader(QWidget):
     upload_signal = pyqtSignal(str,str,str)
     download_signal = pyqtSignal(str,str,str)
 
+    search_signal = pyqtSignal(str,str)
+
     def __init__(self,parent=None):
         super().__init__(parent=parent)
         self.setFixedHeight(100)
@@ -34,6 +36,7 @@ class FilesWidgetHeader(QWidget):
         self.topLayout.setSpacing(2)
         self.search = SearchLineEdit(self)
         self.search.setMaximumWidth(200)
+        self.search.searchSignal.connect(self.searchBucket)
         self.commandBarMove = CommandBar(self)
 
         self.drawbackBtn = ToolButton(FIF.LEFT_ARROW,self)
@@ -254,6 +257,19 @@ class FilesWidgetHeader(QWidget):
 
     def handleUpdate(self):
         self.update_signal.emit(self.currentPath.copy())
+
+    def searchBucket(self,key):
+        if len(self.currentPath) <= 1:
+            print('请选择桶')
+        self.search_signal.emit(self.currentPath[1],key)
+
+    def getBucketAndCurrentPath(self):
+        if len(self.currentPath) <= 1:
+            return "",""
+        pathStr = '/'.join(self.currentPath[2:])
+        if pathStr!='':
+            pathStr = pathStr+'/'
+        return self.currentPath[1],pathStr
 
 
         
