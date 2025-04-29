@@ -12,7 +12,8 @@ import os
 from qasync import QEventLoop, asyncSlot
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # 添加模块所在目录到 sys.path
 from app.main import Window
-from config.GConfig import gConfig
+from config.GConfig import gConfig,cookieJar
+
 
 
 class LoginWindow(QWidget):
@@ -60,7 +61,9 @@ class LoginWidget(QWidget):
 
     def initUI(self):
 
+
         self.manager = QNetworkAccessManager()
+        self.manager.setCookieJar(cookieJar)
         # 创建布局
         layout = QVBoxLayout()
         self.setFixedSize(300,200)

@@ -135,7 +135,7 @@ class S3Uploader:
             this_time_size = 0
             self.__cur_size = 0
             self.__file_size = os.stat(last['local']).st_size
-            part_size =max(math.ceil(self.__file_size / 100),1024)
+            part_size =max(math.ceil(self.__file_size / 100),1024*1024*5)
             done = last['count']
             f.seek(part_size * done)
             self.__cur_size += part_size * done

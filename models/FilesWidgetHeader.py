@@ -20,6 +20,8 @@ class FilesWidgetHeader(QWidget):
     paste_signal = pyqtSignal(str,str)
     delete_signal = pyqtSignal(str,str)
 
+    market_items_add_signal = pyqtSignal(str,str)
+
     upload_signal = pyqtSignal(str,str,str)
     download_signal = pyqtSignal(str,str,str)
 
@@ -53,6 +55,8 @@ class FilesWidgetHeader(QWidget):
         self.pasteBtn.clicked.connect(self.pasteItems)
 
         self.commandBarTrans = CommandBarView(self)
+        self.commandBarTrans.addAction(Action(FIF.SHARE,text='加入市场', triggered=self.addItemIntoMarket))
+        self.commandBarTrans.addSeparator()
         self.commandBarTrans.addAction(Action(FIF.DOWNLOAD,text='下载', triggered=self.downloadItems))
         self.commandBarTrans.addSeparator()
         self.commandBarTrans.addAction(Action(FIF.COPY,text='复制', triggered=self.copyItems))
@@ -251,6 +255,11 @@ class FilesWidgetHeader(QWidget):
         if pathStr!='':
             pathStr = pathStr+'/'
         self.download_signal.emit(self.currentPath[1],localPath,pathStr)
+
+    def addItemIntoMarket(self):
+        bucket,path = self.getBucketAndCurrentPath()
+        self.market_items_add_signal.emit(bucket,path)
+
 
     def setNumber(self,data):
         self.labelTotal.setText(f'已加载{data}条记录')

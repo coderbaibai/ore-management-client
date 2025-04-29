@@ -67,3 +67,6 @@ class DownloadWidget(SubtitleLabel):
 
     def start_download(self,bucket,path,data):
         self.table.start_download(bucket,path,data)
+
+    def start_market_download(self,marketId,marketItemList,marketName,totalSize):
+        self.table.start_market_download(marketId,marketItemList,marketName,totalSize)

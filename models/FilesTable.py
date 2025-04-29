@@ -19,8 +19,11 @@ class FileItem(BodyLabel):
     only_selected_signal = pyqtSignal()
     state_change_signal = pyqtSignal(bool)
 
-    def __init__(self,type:int,name:str,size:str,time:str,parent=None,highlight_start=-1,highlight_end=-1):
+    def __init__(self,type:int,name:str,sizeName:str,time:str,parent=None,highlight_start=-1,highlight_end=-1,size=0):
         super().__init__(parent=parent)
+        self.setFixedHeight(50)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.fileSize = size
         self.__layout = QHBoxLayout(self)
         self.__layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         
@@ -54,11 +57,11 @@ class FileItem(BodyLabel):
         self.__name = BodyLabel(self.color_text_in_range(name,highlight_start,highlight_end,"blue"),self)
         font_metrics = QFontMetrics(self.__name.font())
         text_width = font_metrics.width(self.__name.text())  # 获取文本宽度
-        if text_width>160:
-            text_width = 160
+        if text_width>240:
+            text_width = 240
         self.__name.setFixedWidth(text_width + 10)  # 添加一些额外的空间
 
-        self.__size = CaptionLabel(size,self)
+        self.__size = CaptionLabel(sizeName,self)
         self.__size.setFixedWidth(130)
         self.__type_widget = CaptionLabel(FileType.getTypeName(type),self)
         self.__type_widget.setFixedWidth(100)
@@ -83,7 +86,6 @@ class FileItem(BodyLabel):
         self.hideBtn()
         
         self.setLayout(self.__layout)
-        self.setFixedHeight(50)
 
         self.__name.setCursor(Qt.CursorShape.PointingHandCursor)  # 鼠标悬停显示手型
         self.__name.mousePressEvent = self.nameMousePressEvent
@@ -274,7 +276,7 @@ class RenameDialog(MessageBoxBase):
 
 
 
-class FilesTable(SubtitleLabel):
+class FilesTable(QWidget):
 
     jump_signal = pyqtSignal(str)
     show_signal = pyqtSignal(bool)
@@ -288,11 +290,11 @@ class FilesTable(SubtitleLabel):
         self.fileLayout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.fileLayout.setContentsMargins(0,0,0,0)
         self.fileLayout.setSpacing(0)
+        self.setLayout(self.fileLayout)
 
         self.header = TableHeader(self)
         self.fileLayout.addWidget(self.header)
         self.items:list[FileItem] = []
-        self.setLayout(self.fileLayout)
         self.header.all_selected_signal.connect(self.handle_all_selected_signal)
 
         self.menu = RoundMenu()
@@ -358,7 +360,7 @@ class FilesTable(SubtitleLabel):
                     time = obj['LastModified'].strftime('%Y.%m.%d  %H:%M')
                     type = FileType.file
                     size = obj['Size']
-                    self.items.append(FileItem(type,name,UnitTranslator.convert_bytes(size),time,self))
+                    self.items.append(FileItem(type,name,UnitTranslator.convert_bytes(size),time,self,size=obj['Size']))
 
             if 'CommonPrefixes' in response:
                 for common_prefix in response['CommonPrefixes']:
@@ -381,6 +383,7 @@ class FilesTable(SubtitleLabel):
             self.fileLayout.addWidget(i)
             i.show()
 
+
         self.number_signal.emit(len(self.items))
     
     def search_update(self,bucket,key):
@@ -392,7 +395,7 @@ class FilesTable(SubtitleLabel):
             time = obj['modify'].strftime('%Y.%m.%d  %H:%M')
             type = FileType.file
             size = obj['size']
-            self.items.append(FileItem(type,name,UnitTranslator.convert_bytes(size),time,self,obj['idx'],obj['idx']+len(key)))
+            self.items.append(FileItem(type,name,UnitTranslator.convert_bytes(size),time,self,obj['idx'],obj['idx']+len(key),size=size))
 
         while self.fileLayout.count() > 1:
             item = self.fileLayout.takeAt(1)  # 取出布局中的第一个子项
@@ -415,6 +418,12 @@ class FilesTable(SubtitleLabel):
         for i in self.items:
             if i.getState():
                 res.append(i.getName())
+        return res
+    def getTargetsWithSize(self):
+        res = []
+        for i in self.items:
+            if i.getState():
+                res.append((i.getName(),i.fileSize))
         return res
     
     def findFileName(self,key):

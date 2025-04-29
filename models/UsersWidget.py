@@ -8,7 +8,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QColor
 from PyQt5.QtNetwork import QNetworkRequest, QNetworkAccessManager,QNetworkReply
-from config.GConfig import gConfig
+from config.GConfig import gConfig,cookieJar
 import json
 
 class RenameDialog(MessageBoxBase):
@@ -111,6 +111,7 @@ class UsersWidget(SubtitleLabel):
         self.items = []
         self.selectedItems = {'users':[]}
         self.manager = QNetworkAccessManager()
+        self.manager.setCookieJar(cookieJar)
         self.update()
 
     def update(self):
@@ -121,6 +122,10 @@ class UsersWidget(SubtitleLabel):
 
     def handle_get_all_respose(self,reply:QNetworkReply):
         res = json.loads(reply.readAll().data().decode())
+        if 'code' not in res:
+            print(f"❗ Error Code: {res['status']}\n")
+            print(f"❗ Error msg: {res['error']}")
+            return
         if res['code'] == 0:
             print(f"❗ Error {res['msg']}")
         else:
@@ -135,6 +140,10 @@ class UsersWidget(SubtitleLabel):
 
     def handle_delete_respose(self,reply:QNetworkReply):
         res = json.loads(reply.readAll().data().decode())
+        if 'code' not in res:
+            print(f"❗ Error Code: {res['status']}\n")
+            print(f"❗ Error msg: {res['error']}")
+            return
         if res['code'] == 0:
             print(f"❗ Error {res['msg']}")
         else:
@@ -153,6 +162,10 @@ class UsersWidget(SubtitleLabel):
 
     def handle_add_respose(self,reply:QNetworkReply):
         res = json.loads(reply.readAll().data().decode())
+        if 'code' not in res:
+            print(f"❗ Error Code: {res['status']}\n")
+            print(f"❗ Error msg: {res['error']}")
+            return
         if res['code'] == 0:
             print(f"❗ Error {res['msg']}")
         else:

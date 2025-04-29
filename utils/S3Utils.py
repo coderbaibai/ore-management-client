@@ -5,6 +5,7 @@ import threading
 import boto3
 
 from config.GConfig import gConfig
+from utils.TypeUtils import FileType
 
 class S3Utils:
     def __init__(self):
@@ -123,6 +124,12 @@ class S3Utils:
         response = self.__client.list_objects_v2(Bucket=bucket, Prefix=key)
         for obj in response['Contents']:
             self.__client.delete_object(Bucket=bucket,Key=obj['Key'])
+    
+    def getFileSize(self,bucket,path,file_type):
+        if file_type == FileType.file:
+            return self.__client.head_object(Bucket=bucket, Key=path)['ContentLength']
+        else:
+            pass
 
 
 s3Utils = S3Utils()

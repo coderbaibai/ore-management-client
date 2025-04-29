@@ -5,14 +5,49 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QColor
 from qasync import asyncSlot
-from qfluentwidgets import (InfoBar, InfoBarPosition, setTheme, Theme, FluentWindow,
-                            NavigationAvatarWidget, qrouter, SubtitleLabel, setFont,FluentLabelBase)
+from qfluentwidgets import (InfoBar, InfoBarPosition, SingleDirectionScrollArea, ComboBox, FluentWindow,
+                            MessageBoxBase, LineEdit, SubtitleLabel, setFont,FluentLabelBase)
 from qfluentwidgets import FluentIcon as FIF
 
 from models.FilesWidgetHeader import FilesWidgetHeader
 from models.FilesTable import FilesTable
+from PyQt5.QtNetwork import QNetworkRequest, QNetworkAccessManager,QNetworkReply
 
 from utils.S3Utils import s3Utils
+from config.GConfig import gConfig,cookieJar
+from functools import partial
+import json
+
+
+class SelectMarketDialog(MessageBoxBase):
+    """ Custom message box """
+
+    def __init__(self, parent):
+        super().__init__(parent)
+
+        self.viewLayout.setContentsMargins(10,10,10,10)
+        self.viewLayout.setSpacing(0)
+        
+        self.titleLabel = SubtitleLabel('选择数据市场')
+
+        self.market = ""
+        self.marketId = None
+        self.comboBox = ComboBox()
+        self.comboBox.currentIndexChanged.connect(self.update_target_market)
+    
+        self.items = []
+        self.ids = []
+
+        # 将组件添加到布局中
+        self.viewLayout.addWidget(self.titleLabel)
+        self.viewLayout.addWidget(self.comboBox)
+
+        # 设置对话框的最小宽度
+        self.widget.setMinimumWidth(350)
+
+    def update_target_market(self, index):
+        self.market = self.comboBox.currentText()
+        self.marketId = self.ids[index]
 
 class FilesWidget(SubtitleLabel):
 
@@ -23,14 +58,20 @@ class FilesWidget(SubtitleLabel):
         super().__init__(parent=parent)
         self.setObjectName(text.replace(' ', '-'))
         self.vLayout = QVBoxLayout(self)
+        self.setLayout(self.vLayout)
         self.header = FilesWidgetHeader(self)
-        self.table = FilesTable(self)
+
+        self.scrollTable = QScrollArea()
+        self.scrollTable.setWidgetResizable(True)
+        self.scrollTable.setStyleSheet("background-color: #F7F9FC;")
+        self.table = FilesTable()
+
+        self.scrollTable.setWidget(self.table)
 
         self.vLayout.setContentsMargins(0,0,0,0)
         self.vLayout.setSpacing(0)
         self.vLayout.addWidget(self.header)
-        self.vLayout.addWidget(self.table)
-        self.setLayout(self.vLayout)
+        self.vLayout.addWidget(self.scrollTable)
 
         self.sourceKey = []
         self.sourcePath = ''
@@ -45,6 +86,7 @@ class FilesWidget(SubtitleLabel):
         self.header.move_signal.connect(self.handle_move_signal)
         self.header.paste_signal.connect(self.handle_paste_signal)
         self.header.delete_signal.connect(self.handle_delete_signal)
+        self.header.market_items_add_signal.connect(self.handle_market_items_add_signal)
 
         self.header.upload_signal.connect(self.handle_upload_signal)
         self.header.download_signal.connect(self.handle_download_signal)
@@ -53,6 +95,10 @@ class FilesWidget(SubtitleLabel):
         self.table.rename_signal.connect(self.handle_rename_signal)
 
         self.table.update(['全部文件'])
+
+        self.dialog = None
+        self.manager = QNetworkAccessManager()
+        self.manager.setCookieJar(cookieJar)
 
     def handle_jump_signal(self, data):
         # 处理子组件传递的列表参数
@@ -226,5 +272,80 @@ class FilesWidget(SubtitleLabel):
 
     def handle_search_signal(self,bucket,key):
         self.table.search_update(bucket,key)
+    
+    def handle_market_items_add_signal(self,bucket,path):
+        self.dialog = SelectMarketDialog(self.window())
+        url = QUrl(gConfig['server']['spring']['url']+'/market/current')
+        request = QNetworkRequest(url)
+        handler = partial(self.handle_get_markets_respose,bucket=bucket,path=path)
+        self.manager.finished.connect(handler)
+        self.manager.get(request)
 
+    def handle_get_markets_respose(self,reply:QNetworkReply,bucket:str,path:str):
+        self.manager.finished.disconnect()
+        res = json.loads(reply.readAll().data().decode())
+        if 'code' not in res:
+            print(f"❗ Error Code: {res['status']}\n")
+            print(f"❗ Error msg: {res['error']}")
+            return
+        if res['code'] == 0:
+            print(f"❗ Error {res['msg']}")
+        else:
+            self.dialog.items = [dic['name'] for dic in res['data']['markets']]
+            self.dialog.ids = [dic['id'] for dic in res['data']['markets']]
+            self.dialog.comboBox.addItems(self.dialog.items)
+            if self.dialog.exec_():
+                self.add_market_items(self.dialog.marketId,bucket,path)
+        reply.deleteLater()
+    
+    def add_market_items(self,marketId:str,bucket:str,path:str):
+        targets = self.table.getTargetsWithSize()
+        # "marketId": 1,
+        # "name": "长语汐",
+        # "bucketName": "颜敏",
+        # "path": "laboru",
+        # "available": 1
+        items = []
+        for (target,targetSize) in targets:
+            item = {}
+            item['marketId'] = marketId
+            item['name'] = bucket+':'+path+target
+            item['bucketName'] = bucket
+            item['path'] = path+target
+            item['available'] = 1
+            item['size'] = targetSize
+            items.append(item)
+        data_to_post = {}
+        data_to_post['marketItems'] = items
+        # 转换为JSON字符串并编码为字节
+        json_data = json.dumps(data_to_post).encode('utf-8')
+
+        url = QUrl(gConfig['server']['spring']['url']+'/market/items/add')
+        request = QNetworkRequest(url)
+        request.setHeader(QNetworkRequest.KnownHeaders.ContentTypeHeader, "application/json")
+
+        # 发送 POST 请求
+        self.manager.finished.connect(self.handle_add_items_respose)
+        self.manager.post(request, json_data)
+
+    def handle_add_items_respose(self,reply:QNetworkReply):
+        self.manager.finished.disconnect()
+        res = json.loads(reply.readAll().data().decode())
+        if 'code' not in res:
+            print(f"❗ Error Code: {res['status']}\n")
+            print(f"❗ Error msg: {res['error']}")
+            return
+        if res['code'] == 0:
+            print(f"❗ Error {res['msg']}")
+        else:
+            InfoBar.success(
+                title='添加成功',
+                content="",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=1000,
+                parent=self.window()
+            ).show()
+        reply.deleteLater()
 

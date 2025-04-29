@@ -35,6 +35,7 @@ class TransportRecord(Model):
     bucket = TextField(null=True)
     cloud = TextField(null=True)
     finish = IntegerField(null=True)
+    market_id = IntegerField(null=True)
 
     class Meta:
         database = transport_db

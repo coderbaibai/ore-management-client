@@ -11,6 +11,7 @@ from qfluentwidgets import FluentIcon as FIF
 from models.FilesWidgetHeader import FilesWidgetHeader
 from utils.S3Utils import s3Utils
 from utils.S3Uploader import S3Uploader
+from utils.S3Downloader import *
 from utils.SqliteUtils import TransportRecord
 from utils.TypeUtils import FileType,StateType,UnitTranslator
 from peewee import Select
@@ -252,6 +253,7 @@ class DownloadTable(SubtitleLabel):
 
     show_signal = pyqtSignal(bool)
     number_signal = pyqtSignal(int)
+    market_download_finish_signal = pyqtSignal(int,str)
 
     def __init__(self,parent=None):
         super().__init__(parent=parent)
@@ -265,9 +267,9 @@ class DownloadTable(SubtitleLabel):
         self.items:list[DownloadItem] = []
         self.setLayout(self.fileLayout)
         self.header.all_selected_signal.connect(self.handle_all_selected_signal)
-        self.__uploaderList :list[S3Uploader] = []
+        self.__downloaderList :list[S3Downloader] = []
         self.timer = QTimer(self)
-        self.timer.timeout.connect(self.updateUploader)
+        self.timer.timeout.connect(self.updateDownloader)
         self.timer.start(gConfig['client']['update-time'])
     
     def handle_selected_signal(self):
@@ -293,27 +295,27 @@ class DownloadTable(SubtitleLabel):
 
     def handle_is_pause_signal(self,id,is_pause):
         if is_pause:
-            for uploader in self.__uploaderList:
+            for uploader in self.__downloaderList:
                 if uploader.get_id()==id:
                     uploader.stop()
-            self.__uploaderList = [item for item in self.__uploaderList if item.get_id()!=id]  
+            self.__downloaderList = [item for item in self.__uploaderList if item.get_id()!=id]  
         else:
-            if len(self.__uploaderList)>=gConfig['client']['uploader-length']:
-                #如果超出长度，暂停第一个
-                first = self.__uploaderList[0].get_id()
-                for i in self.items:
-                    if i.getId()==first:
-                        i.pause()
-                        break
-                self.__uploaderList[0].stop()
-                self.__uploaderList = self.__uploaderList[1:]
+            # if len(self.__downloaderList)>=gConfig['client']['uploader-length']:
+            #     #如果超出长度，暂停第一个
+            #     first = self.__downloaderList[0].get_id()
+            #     for i in self.items:
+            #         if i.getId()==first:
+            #             i.pause()
+            #             break
+            #     self.__downloaderList[0].stop()
+            #     self.__upload__downloaderListerList = self.__downloaderList[1:]
 
             for i in self.items:
                 if i.getId()==id:
-                    uploader = S3Uploader(i.bucket,i.cloud,i.local,id)
-                    up_thread = Thread(target=uploader.execute)
-                    up_thread.start()
-                    self.__uploaderList.append(uploader)
+                    downloader = (i.bucket,i.cloud,i.local,id)
+                    down_thread = Thread(target=downloader.execute)
+                    down_thread.start()
+                    self.__downloaderList.append(uploader)
 
 
 
@@ -322,10 +324,10 @@ class DownloadTable(SubtitleLabel):
         self.items.clear()
         temps :list[TransportRecord] = list(TransportRecord.select().where(
                 (TransportRecord.finish == 0) &
-                (TransportRecord.state == StateType.upload)
+                (TransportRecord.state == StateType.download)
             ))
         for tmp in temps:
-            self.items.append(DownloadItem(tmp.id,tmp.type,tmp.name,str(tmp.size),tmp.bucket,tmp.cloud,tmp.local,self))
+            self.items.append(DownloadItem(tmp.id,tmp.type,tmp.name,UnitTranslator.convert_bytes(tmp.size),tmp.bucket,tmp.cloud,tmp.local,self))
 
         while self.fileLayout.count() > 1:
             item = self.fileLayout.takeAt(1)  # 取出布局中的第一个子项
@@ -376,32 +378,53 @@ class DownloadTable(SubtitleLabel):
         if len(temps)==0:
             print('error')
             return
-        if len(self.__uploaderList)>=gConfig['client']['uploader-length']:
-            return
-        uploader = S3Uploader(bucket,path,local,temps[0].id)
-        up_thread = Thread(target=uploader.execute)
-        up_thread.start()
+        # if len(self.__uploaderList)>=gConfig['client']['uploader-length']:
+        #     return
+        downloader = S3FileDownloader(bucket,path,local,temps[0].id)
+        down_thread = Thread(target=downloader.execute)
+        down_thread.start()
         for tmp in self.items:
             if tmp.getId()==temps[0].id:
                 tmp.start()
-        self.__uploaderList.append(uploader)
+        self.__downloaderList.append(downloader)
+
+    def start_market_download(self,marketId,marketItemList,marketName,totalSize):
+        self.update()
+        temps = list(TransportRecord.select().where(
+            (TransportRecord.market_id == marketId) &
+            (TransportRecord.finish == 0)
+        ))
+        if len(temps)==0:
+            print('error')
+            return
+        downloader = S3MarketDownloader(marketId,marketItemList,marketName,totalSize,temps[0].id)
+        down_thread = Thread(target=downloader.execute)
+        down_thread.start()
+
+        for tmp in self.items:
+            if tmp.getId()==temps[0].id:
+                tmp.start()
+        self.__downloaderList.append(downloader)
+        
     
-    def updateUploader(self):
-        for uploader in self.__uploaderList:
-            id = uploader.get_id()
-            if uploader.is_finished():
+    def updateDownloader(self):
+        for downloader in self.__downloaderList:
+            id = downloader.get_id()
+            if downloader.is_finished():
+                if isinstance(downloader,S3MarketDownloader):
+                    self.market_download_finish_signal.emit(downloader.marketId,downloader.marketName)
                 record:TransportRecord = TransportRecord.get_by_id(id)
                 record.finish = 1
                 record.save()
-                uploader.stop()
+                downloader.stop()
                 self.deleteById(id)
             else:
                 for tmp in self.items:
                     if tmp.getId()==id:
-                        tmp.setRate(UnitTranslator.convert_bytes(uploader.get_delta()*4)+'/s')
-                        tmp.setValue(uploader.get_process())
+                        tmp.setRate(UnitTranslator.convert_bytes(downloader.get_delta()*4)+'/s')
+                        tmp.setValue(downloader.get_process())
                         
-        self.__uploaderList = [item for item in self.__uploaderList if not item.is_finished()]  
+        self.__downloaderList = [item for item in self.__downloaderList if not item.is_finished()]  
                 
     def deleteById(self,id):
         for (index,val) in enumerate(self.items):
