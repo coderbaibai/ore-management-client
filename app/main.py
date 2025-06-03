@@ -15,19 +15,20 @@ from qfluentwidgets import (NavigationItemPosition, InfoBar, InfoBarPosition, Th
                             NavigationAvatarWidget, qrouter, SubtitleLabel, setFont)
 from qfluentwidgets import FluentIcon as FIF
 
-from models.FilesWidget import FilesWidget
-from models.MarketsWidget import MarketWidget
-from models.TransportWidget import TransportWidget
-from models.UploadWidget import UploadWidget
-from models.DownloadWidget import DownloadWidget
-from models.SettingWidget import SettingWidget
-from models.UsersWidget import UsersWidget
-from models.StatisticWidget import StatisticWidget
+from views.FilesWidget import FilesWidget
+from views.MarketsWidget import MarketWidget
+from views.TransportWidget import TransportWidget
+from views.UploadWidget import UploadWidget
+from views.DownloadWidget import DownloadWidget
+from views.SettingWidget import SettingWidget
+from views.UsersWidget import UsersWidget
+from views.StatisticWidget import StatisticWidget
+from views.ExportWidget import ExportWidget
 
 import tkinter as tk
 from tkinter import filedialog
-from utils.S3Uploader import *
-from utils.S3Downloader import *
+from OreUtils.S3Uploader import *
+from OreUtils.S3Downloader import *
 from qasync import QEventLoop, asyncSlot
 
 # 创建一个 Tkinter 根窗口（不显示窗口）
@@ -61,6 +62,7 @@ class Window(FluentWindow):
         self.downloadInterface = DownloadWidget('Download Interface',self)
         self.uploadInterface = UploadWidget('Upload Interface',self)
         self.statisticInterface = StatisticWidget('statistic Interface', self)
+        self.exportInterface = ExportWidget('export Interface', self)
         self.libraryInterface = UsersWidget('Management Interface', self)
         self.settingInterface = SettingWidget('settings Interface', self)
         self.navigationInterface.setExpandWidth(170)
@@ -81,6 +83,7 @@ class Window(FluentWindow):
         self.addSubInterface(self.uploadInterface, FIF.UP, '正在上传',parent=self.transportInterface)
         self.addSubInterface(self.marketInterface, FIF.TAG, '数据市场')
         self.addSubInterface(self.statisticInterface, FIF.BOOK_SHELF, '处理')
+        self.addSubInterface(self.exportInterface, FIF.IMAGE_EXPORT, '导出')
         self.addSubInterface(self.libraryInterface, FIF.PEOPLE, '管理', position= NavigationItemPosition.BOTTOM)
         self.addSubInterface(self.settingInterface, FIF.SETTING, '设置', position= NavigationItemPosition.BOTTOM)
 
@@ -103,7 +106,7 @@ class Window(FluentWindow):
                 isClosable=True,
                 position=InfoBarPosition.TOP,
                 duration=1000,
-                parent=self
+                parent=self.window()
             ).show()
         else:
             self.uploadInterface.start_upload(bucket,path,local)
@@ -118,7 +121,7 @@ class Window(FluentWindow):
                     isClosable=True,
                     position=InfoBarPosition.TOP,
                     duration=1000,
-                    parent=self
+                    parent=self.window()
                 ).show()
             else:
                 self.downloadInterface.start_download(bucket,tmp['cloud'],tmp['local'])
@@ -130,12 +133,12 @@ class Window(FluentWindow):
         url.setQuery(query)
         request = QNetworkRequest(url)
         handler = partial(self.market_download_response,marketName = marketName)
-        self.manager.finished.connect(handler)
-        self.manager.get(request)
+        reply =  self.manager.get(request)
+        reply.finished.connect(lambda: handler(reply=reply))
             
     def market_download_response(self,reply:QNetworkReply,marketName):
-        self.manager.finished.disconnect()
         res = json.loads(reply.readAll().data().decode())
+        reply.deleteLater()
         if 'code' not in res:
             print(f"❗ Error Code: {res['status']}\n")
             print(f"❗ Error msg: {res['error']}")
@@ -149,6 +152,7 @@ class Window(FluentWindow):
             if len(res['data']['marketItems']):
                 if S3MarketDownloader.start(res['data']['marketItems'][0]['marketId'],marketName,total_size):
                     self.downloadInterface.start_market_download(res['data']['marketItems'][0]['marketId'],res['data']['marketItems'],marketName,total_size)
+                    
 
     def handle_market_download_finish_signal(self,marketId,marketName):
         InfoBar.success(
@@ -158,7 +162,7 @@ class Window(FluentWindow):
             isClosable=True,
             position=InfoBarPosition.TOP,
             duration=1000,
-            parent=self
+            parent=self.window()
         ).show()
         self.statisticInterface.process(marketId,marketName)
 

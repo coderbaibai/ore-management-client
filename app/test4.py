@@ -1,8 +1,8 @@
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # 添加模块所在目录到 sys.path
-from utils.SqliteUtils import TransportRecord
-from utils.TypeUtils import *
+from OreUtils.SqliteUtils import TransportRecord
+from OreUtils.TypeUtils import *
 
 data_finish = {
     'name' :'测试文件',

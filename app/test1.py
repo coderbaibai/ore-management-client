@@ -12,8 +12,8 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QColor
 from qfluentwidgets import *
-from utils.S3Uploader import S3Uploader
-from utils.S3Downloader import S3Downloader
+from OreUtils.S3Uploader import S3Uploader
+from OreUtils.S3Downloader import S3Downloader
 
 from config.GConfig import gConfig
 import boto3

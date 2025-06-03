@@ -14,7 +14,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # 
 from app.main import Window
 from config.GConfig import gConfig,cookieJar
 
-
+import faulthandler
 
 class LoginWindow(QWidget):
     def __init__(self):
@@ -129,6 +129,7 @@ class LoginWidget(QWidget):
 async def main():
     root = tk.Tk()
     root.withdraw()  # 隐藏主窗口
+    faulthandler.enable()
     app = QApplication(sys.argv)
     loop = QEventLoop(app)
     asyncio.set_event_loop(loop)
